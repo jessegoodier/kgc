@@ -1,0 +1,4 @@
+subprocess32==3.5.4
+json5==0.9.5
+prettytable==2.1.0
+termcolor==1.1.0

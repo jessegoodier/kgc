@@ -16,8 +16,13 @@ def get_failure_events(namespace, name):
 
 def print_pods_table(pods):
     table = PrettyTable()
-    table.align = "l"  # Left align all columns
-    table.border = False  # Don't draw a border around the table
+
+    # table.align = "l"  # Left align all columns
+    table.align["Pod Name"] = "l"
+    table.align["Container Name"] = "l"
+    table.align["Status"] = "l"
+    # table.padding_width = 1  # Pad each cell with 1
+    # table.border = False  # Don't draw a border around the table
     table.field_names = ["Pod Name", "Container Name", "Status"]
     for pod,container,status in pods:
         if status == "Ready" or status == "Completed":
