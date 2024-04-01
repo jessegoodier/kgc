@@ -260,6 +260,8 @@ function print_failure_events() {
   # print simple error messages for common issues
   if [[ $failure_reason = *"free ports"* ]]; then
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "hostNetwork port is in use"
+  elif [[ $failure_reason = *"Back-off restarting failed container"* ]]; then
+    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "Back-off restarting failed container: Check pod logs"
   # If there are no recent events, consider restarting the pod, also kubectl descripe pod
   elif [[ $failure_reason = "null" ]]; then
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "No recent events"
