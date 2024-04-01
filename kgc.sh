@@ -19,6 +19,7 @@
 
 function kgc {
 # k get containers, show failures
+# this fucntion is not indented, look for the /end-kgc comment
 
 # Define color variables
 RED="\033[0;31m"
@@ -27,14 +28,72 @@ WHITE="\033[1;37m"
 CYAN="\033[0;36m"
 RESET="\033[0m"
 
+
+# Initialize argument variables
+a_argument=false
+n_argument=""
+hide_pod_errors=false
+hide_replicaset_errors=false
+
+# Check for -h or --help before getopts loop
+if [[ " $* " =~ (--help|-h) ]]; then
+    echo "Usage: $(basename $0) [namespace] OR [OPTION]..."
+    echo "Example:"
+    echo "kgc kube-system will get all pods in the kube-system namespace"
+    echo "kgc -n kube-system will also get all pods in the kube-system namespace, for consistency with traditional commands"
+    echo "kgc with no arguments will get all pods in the current context's namespace"
+    echo "Available options:"
+    echo "  -a or -A       Get containers in all namespaces"
+    echo "  -n namespace   Specific namespace (-n is optional)"
+    echo "  -h or --help   Display this help and exit"
+    echo "  -p             Hide pods error list"
+    echo "  -r             Hide replicaset issues"
+    return
+fi
+
+# Parse arguments if n is passed it requires a namespace
+while getopts ":aAn:pr" opt; do
+  case ${opt} in
+    a | A )
+      a_argument=true  # Set to true when -a or -A is triggered
+      ;;
+    n )
+      n_argument=$OPTARG
+      ;;
+    p )
+      hide_pod_errors=true
+      ;;
+    r )
+      hide_replicaset_errors=true
+      ;;
+    \? )
+      echo "Invalid option: $OPTARG" 1>&2
+      ;;
+    : )
+      echo "Invalid option: $OPTARG requires an argument" 1>&2
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
 # get the namespace from the first argument, otherwise use the current namespace
-namespace_arg=$1
+if [[ -z "$n_argument" ]]; then
+  namespace_arg=$1
+else
+  namespace_arg=$n_argument
+fi
+
 issue_counter=0
 
+# use current context namspace if nothing else is passed
 if [[ -z "$namespace_arg" ]]; then
   namespace=$(kubectl config view --minify --output 'jsonpath={..namespace}')
 else
   namespace=$namespace_arg
+fi
+
+if [[ $a_argument == true ]]; then
+  namespace_arg="all"
 fi
 
 declare -a current_failures
@@ -113,7 +172,7 @@ for pod in "${pod_list[@]}"; do
   if [ "$num_containers_in_this_pod" -lt 1 ]; then
     ((issue_counter+=1))
     printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s${RESET}\n" "$ns_col" "$pod" "-" "-" "false ($issue_counter)"
-    current_failures+=("$pod" "$namespace")
+    current_failures+=("$pod"/"$namespace")
     continue
   fi
 
@@ -125,6 +184,7 @@ for pod in "${pod_list[@]}"; do
     container_image=$(echo "$containers_in_this_pod_json" | jq -r ".| select(.name == \"$container_name\") |.image")
     container_imageID=$(echo "$containers_in_this_pod_json" | jq -r ".| select(.name == \"$container_name\") |.imageID")
     container_image_short=${container_image##*/}
+    # some container image names are just sha256 hashes. If it is, the imageID is more useful
     if [[ $container_image_short == sha256* ]]; then
       imageID="${container_imageID##*/}"  # Remove everything before the last /
       container_image_short="${imageID%%@*}"  # Remove everything after the first @
@@ -142,45 +202,57 @@ for pod in "${pod_list[@]}"; do
         else
           ((issue_counter+=1))
           printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s${RESET}\n" "$ns_col" "$pod" "$container_name" "$container_image_short" "$terminated_reason ($issue_counter)"
-          current_failures+=("$pod" "$namespace")
+          current_failures+=("$pod"/"$namespace")
         fi
       fi
     fi
   done
 done
-
-# Print any pods with failing containers
-if [[ ${#current_failures[@]} -gt 0 ]]; then
-  printf "\nPods with failing containers:\n"
-  # index is the number in () next to the failing pod
-  index=1
-  # make loop compatible with zsh and bash
-  for ((i=0; i<${#current_failures[@]:0:1}; i+=2)); do
-    pod=${current_failures[*]:0:1}
-    namespace=${current_failures[*]:1:1}
-    get_failure_events "$pod" "$namespace" "pod"
-    index=$((index+1))
-  done
-fi
-
-replica_sets=$(kubectl get replicaset -n "$namespace" -o json)
-replica_sets_with_unavailable_replicas=($(jq -r '.items[] | select(.status.replicas <.spec.replicas) |.metadata.name,.metadata.namespace' <<< "$replica_sets"))
-
-if [[ ${#replica_sets_with_unavailable_replicas[@]} -gt 0 ]]; then
-  printf "\nUnavailable ReplicaSets:\n"
-  # make loop compatible with zsh and bash
-  for ((i=0; i<${#replica_sets_with_unavailable_replicas[@]:0:1}; i+=2)); do
-    replica_set=${replica_sets_with_unavailable_replicas[*]:0:1} 
-    namespace=${replica_sets_with_unavailable_replicas[*]:1:1}
-    get_failure_events "$replica_set" "$namespace" "replica_set"
-  done
-fi
+if [ "$hide_pod_errors" = false ]; then print_pod_failures; fi
+if [ "$hide_replicaset_errors" = false ]; then print_replicaset_failures; fi
+# /end-kgc
 }
 
-function get_failure_events() {
+function print_pod_failures() {
+  # Print any pods with failing containers
+  if [[ ${#current_failures[@]} -gt 0 ]]; then
+    printf "\nPods with failing containers:\n"
+    # index is the number in () next to the failing pod
+    index=1
+    for failure_event in "${current_failures[@]}";  do
+      IFS='/' read -r pod namespace <<< "$failure_event"
+      # echo "Pod: $pod"
+      # echo "Namespace: $namespace"
+      print_failure_events "$pod" "$namespace" "pod"
+      index=$((index+1))
+    done
+  fi
+}
+
+function print_replicaset_failures() {
+  if [[ $namespace_arg == "all" ]]; then
+    replicasets_json=$(kubectl get replicaset -A -o json)
+  else
+    replicasets_json=$(kubectl get replicaset -n "$namespace" -o json)
+  fi
+  replicasets_with_unavailable_replicas=($(jq -r '.items[] | select(.status.replicas <.spec.replicas) |.metadata.name' <<< "$replicasets_json"))
+  # Check if the array has at least one element
+  if [ ${#replicasets_with_unavailable_replicas[@]} -gt 0 ]; then
+      printf "\nUnavailable ReplicaSets:\n"
+  fi
+
+  for replicaset_name in "${replicasets_with_unavailable_replicas[@]}";  do
+      replicaset_namespace=$(echo "$replicasets_json" | jq -r ".items[]|select(.metadata.name == \"$replicaset_name\") |.metadata.namespace")
+      replicaset_reason=$(echo "$replicasets_json" | jq -r ".items[]|select(.metadata.name == \"$replicaset_name\") |.status.conditions[] | select(.type == \"ReplicaFailure\") |.reason")
+      replicaset_message=$(echo "$replicasets_json" | jq -r ".items[]|select(.metadata.name == \"$replicaset_name\") |.status.conditions[] | select(.type == \"ReplicaFailure\") |.message")
+      print_failure_events "$replicaset_name" "$replicaset_namespace" "replica_set" "$replicaset_reason" "$replicaset_message"
+  done
+}
+
+function print_failure_events() {
   current_object=$1
   current_namespace=$2
-  cuurent_type=$3
+  current_type=$3
   failure_reason=$(kubectl get events -n "$current_namespace" --sort-by=lastTimestamp --field-selector type!=Normal,involvedObject.name="$current_object" -ojson | jq -r '.items[0].message' 2> /dev/null)
   # print simple error messages for common issues
   if [[ $failure_reason = *"free ports"* ]]; then
@@ -188,10 +260,9 @@ function get_failure_events() {
   # If there are no recent events, consider restarting the pod, also kubectl descripe pod
   elif [[ $failure_reason = "null" ]]; then
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "No recent events"
-  elif [[ $cuurent_type == "replica_set" ]]; then
+  elif [[ $current_type == "replica_set" ]]; then
     printf "${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}:\n${CYAN}%s${RESET}\n" "$current_namespace" "$current_object" "$failure_reason"
   else
-    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}\n${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object:" "$failure_reason"
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}\n${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object:" "$failure_reason"
   fi
 }
