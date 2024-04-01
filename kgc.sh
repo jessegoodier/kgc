@@ -38,16 +38,15 @@ hide_replicaset_errors=false
 # Check for -h or --help before getopts loop
 if [[ " $* " =~ (--help|-h) ]]; then
     echo "Usage: $(basename $0) [namespace] OR [OPTION]..."
-    echo "Example:"
-    echo "kgc kube-system will get all pods in the kube-system namespace"
-    echo "kgc -n kube-system will also get all pods in the kube-system namespace, for consistency with traditional commands"
-    echo "kgc with no arguments will get all pods in the current context's namespace"
+    echo "Examples:"
+    echo "kgc -n kube-system - will get all pods in the kube-system namespace"
+    echo "kgc with no arguments will get all containers in the current context's namespace"
     echo "Available options:"
     echo "  -a or -A       Get containers in all namespaces"
-    echo "  -n namespace   Specific namespace (-n is optional)"
+    echo "  -n namespace   Specific namespace"
+    echo "  -p             Hide pod error list"
+    echo "  -r             Hide replicaset error list"
     echo "  -h or --help   Display this help and exit"
-    echo "  -p             Hide pods error list"
-    echo "  -r             Hide replicaset issues"
     return
 fi
 
@@ -253,10 +252,14 @@ function print_failure_events() {
   current_object=$1
   current_namespace=$2
   current_type=$3
+  # echo "current_object=$current_object"
+  # echo "current_type=$current_type"
+  # echo "current_namespace=$current_namespace"
+  
   failure_reason=$(kubectl get events -n "$current_namespace" --sort-by=lastTimestamp --field-selector type!=Normal,involvedObject.name="$current_object" -ojson | jq -r '.items[0].message' 2> /dev/null)
   # print simple error messages for common issues
   if [[ $failure_reason = *"free ports"* ]]; then
-    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "Port is in use"
+    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "hostNetwork port is in use"
   # If there are no recent events, consider restarting the pod, also kubectl descripe pod
   elif [[ $failure_reason = "null" ]]; then
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "No recent events"
