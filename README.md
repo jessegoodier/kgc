@@ -48,3 +48,18 @@ wget -O ~/kgc.sh https://raw.githubusercontent.com/jessegoodier/kgc/main/kgc.sh
 echo "source ~/kgc.sh" >> ~/.zshrc
 echo "source ~/kgc.sh" >> ~/.bashrc
 ```
+
+## Example commands
+
+```sh
+Usage: kgc [namespace] OR [arguments]...
+Examples:
+kgc -n kube-system - will get all pods in the kube-system namespace
+kgc with no arguments will get all containers in the current context's namespace
+Available arguments:
+  -a or -A       Get containers in all namespaces
+  -n namespace   Specific namespace
+  -p             Hide pod error list
+  -r             Hide replicaset error list
+  -h or --help   Display this help and exit
+```
