@@ -15,7 +15,7 @@
 # You may have an alias for kgc already, if so, you can unalias it before sourcing this file
 # unalias kgc 2> /dev/null
 # There are not a ton of comments in this file, but any AI can explain it, whih I find to be simple to do and cleaner than adding comments
-# I attempted to make the output as clean as possible, but it is not perfect, for example, the space before the pod when not using `kgc all` 
+# I attempted to make the output as clean as possible, but it is not perfect, for example, the space before the pod when not using `kgc all`
 
 function kgc {
 # k get containers, show failures
@@ -26,6 +26,7 @@ RED="\033[0;31m"
 YELLOW="\033[1;33m"
 WHITE="\033[1;37m"
 CYAN="\033[0;36m"
+GREEN="\033[0;32m"
 RESET="\033[0m"
 
 
@@ -101,8 +102,8 @@ namespace_column=0
 
 # Get all pods in the namespace
 if [[ $namespace_arg == "all" ]]; then
-  pods_json=$(kubectl get pods -o json -A| jq '.items[] | {namespace: .metadata.namespace, name: .metadata.name, status: .status.phase, containers: .status.containerStatuses}')
-  namespace_list=($(echo "$pods_json" | jq -r '.namespace'))
+  pods_json=$(kubectl get pods -o json -A| jq '.items[]')
+  namespace_list=($(echo "$pods_json" | jq -r '.metadata.namespace'|sort -u))
 
   # Figure out the table spacing with namespace
   for namespace_name in "${namespace_list[@]}"; do
@@ -113,10 +114,10 @@ if [[ $namespace_arg == "all" ]]; then
   done
 
 else
-  pods_json=$(kubectl get pods -n "$namespace" -o json | jq '.items[] | {namespace: .metadata.namespace, name: .metadata.name, status: .status.phase, containers: .status.containerStatuses}')
+  pods_json=$(kubectl get pods -n "$namespace" -o json | jq '.items[]')
 fi
 
-pod_list=($(echo "$pods_json" | jq -r '.name'))
+pod_list=($(echo "$pods_json" | jq -r '.metadata.name'))
 
 # Figure out the table spacing
 pod_column=4 # needs to be at least as long as the word "Pod"
@@ -128,7 +129,7 @@ for pod_name in "${pod_list[@]}"; do
 done
 
 # find the longest container name for the column width
-container_list=($(echo "$pods_json" | jq -r 'select(.containers != null) | .containers[].name'))
+container_list=($(echo "$pods_json" | jq '.spec.containers[].name'))
 container_name_column=15 # needs to be at least as long as the words "Container Name"
 for container_name in "${container_list[@]}"; do
   column_width=${#container_name}
@@ -139,7 +140,7 @@ done
 
 # find the longest container image name for the column width
 container_image_column=6 # needs to be at least as long as the words "Image"
-container_image_list=($(echo "$pods_json" | jq -r 'select(.containers != null) | .containers[].image'))
+container_image_list=($(echo "$pods_json" | jq -r '.spec.containers[].image'))
 
 for container_image_name in "${container_image_list[@]}"; do
   container_image_short=${container_image_name##*/}
@@ -160,41 +161,46 @@ else
 fi
 
 for pod in "${pod_list[@]}"; do
-  num_containers_in_this_pod=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers| length" || echo 0)
+  # pod_json=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\")")
+  # num_containers_in_this_pod=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers| length" || echo 0)
   if [[ $namespace_arg == "all" ]]; then
-    namespace=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.namespace")
+    namespace=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\") |.metadata.namespace")
     ns_col=$namespace
   else
     ns_col=""
   fi
-
-  if [ "$num_containers_in_this_pod" -lt 1 ]; then
-    ((issue_counter+=1))
-    printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s${RESET}\n" "$ns_col" "$pod" "-" "-" "false ($issue_counter)"
-    current_failures+=("$pod"/"$namespace")
-    continue
-  fi
-
-  containers_in_this_pod_json=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers[]")
-  containers_in_this_pod_list=($(echo "$containers_in_this_pod_json" | jq -r ".name"))
+  # shellcheck disable=SC2207
+  containers_in_this_pod_list=($(echo "$pods_json" | jq -r --arg pod "$pod" '. | select(.metadata.name == $pod) | select(.spec.containers != null) | .spec.containers[].name'))
+  containers_statuses_json=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\") | select(.status.containerStatuses != null) | .status.containerStatuses[]")
+  
   for container_name in "${containers_in_this_pod_list[@]}"; do
+    # check to see if the pod is unschedulable
+    is_unschedulable=$(echo "$pods_json" |  jq -r ".| select(.metadata.name == \"$pod\") |.status.conditions[] | select(.reason == \"Unschedulable\") | .reason")
+    if [[ $is_unschedulable == "Unschedulable" ]]; then
+      container_ready="unschedulable"
+    else
+      container_ready=$(echo "$containers_statuses_json" | jq -r ".| select(.name == \"$container_name\") |.ready")
+    fi
 
-    container_ready=$(echo "$containers_in_this_pod_json" | jq -r ".| select(.name == \"$container_name\") |.ready")
-    container_image=$(echo "$containers_in_this_pod_json" | jq -r ".| select(.name == \"$container_name\") |.image")
-    container_imageID=$(echo "$containers_in_this_pod_json" | jq -r ".| select(.name == \"$container_name\") |.imageID")
+    container_image=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\") |.spec.containers[] | select(.name == \"$container_name\") |.image")
+    container_imageID=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\") |.spec.containers[] | select(.name == \"$container_name\") |.imageID" || echo "")
     container_image_short=${container_image##*/}
     # some container image names are just sha256 hashes. If it is, the imageID is more useful
     if [[ $container_image_short == sha256* ]]; then
       imageID="${container_imageID##*/}"  # Remove everything before the last /
       container_image_short="${imageID%%@*}"  # Remove everything after the first @
     fi
- 
+
     if [[ "$container_ready" == "true" ]]; then
-      printf "\033[32m%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready"
+      printf "${GREEN}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready"
+    elif [[ "$container_ready" == "unschedulable" ]]; then
+      ((issue_counter+=1))
+      printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready ($issue_counter)"
+      current_failures+=("$pod"/"$namespace")
     else
       terminated_reason=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers[0].state.terminated.reason")
       if [[ "$terminated_reason" == "Completed" ]]; then
-        printf "\033[32m%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$terminated_reason"
+        printf "${GREEN}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$terminated_reason"
       else
         if [[ "$terminated_reason" == "OOMKilled" ]]; then
           printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s${RESET}\n" "$ns_col" "$pod" "$container_name" "$container_image_short" "$terminated_reason"
@@ -255,7 +261,7 @@ function print_failure_events() {
   # echo "current_object=$current_object"
   # echo "current_type=$current_type"
   # echo "current_namespace=$current_namespace"
-  
+
   failure_reason=$(kubectl get events -n "$current_namespace" --sort-by=lastTimestamp --field-selector type!=Normal,involvedObject.name="$current_object" -ojson | jq -r '.items[0].message' 2> /dev/null)
   # print simple error messages for common issues
   if [[ $failure_reason = *"free ports"* ]]; then
