@@ -1,17 +1,13 @@
 #!/bin/bash
 
-## This is a function. use it by sourcing it in your shell and calling one of the functions
-## source .kgc.sh
-## run it without and argument to get the current namespace
-## kgc all will run it against all namespaces.
 ## Currently maintained here:
 ## <https://github.com/jessegoodier/kgc/>
 
-# The name kgc is because it is like the alias `kgp` for kubectl get pods
+# The name "kgc" is because it is like the alias `kgp` for kubectl get pods
 # kgc is to k get containers
 # it also prints related errors to help identify the cause of failing containers
-# Add to your profile by sourcing this file in your .zshrc or .bashrc
-# source ~/.kgc.sh
+# Add an alias to your profile in your .zshrc or .bashrc
+# alias kgc="~/kgc.sh"
 # You may have an alias for kgc already, if so, you can unalias it before sourcing this file
 # unalias kgc 2> /dev/null
 # There are not a ton of comments in this file, but any AI can explain it, whih I find to be simple to do and cleaner than adding comments
@@ -68,9 +64,11 @@ while getopts ":aAn:pr" opt; do
       ;;
     \? )
       echo "Invalid option: $OPTARG" 1>&2
+      exit 1
       ;;
     : )
       echo "Invalid option: $OPTARG requires an argument" 1>&2
+      exit 1
       ;;
   esac
 done
@@ -213,8 +211,8 @@ for pod in "${pod_list[@]}"; do
     fi
   done
 done
-if [ "$hide_pod_errors" = false ]; then print_pod_failures; fi
-if [ "$hide_replicaset_errors" = false ]; then print_replicaset_failures; fi
+if [ "$hide_pod_errors" = "false" ]; then print_pod_failures; fi
+if [ "$hide_replicaset_errors" = "false" ]; then print_replicaset_failures; fi
 # /end-kgc
 }
 
@@ -287,3 +285,6 @@ function print_table_header() {
     printf " %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n" "Pod" "Container Name" "Image" "Ready"
   fi
 }
+
+kgc "$1" "$2"
+
