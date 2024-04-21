@@ -39,6 +39,7 @@ usage() {
     echo "Examples:"
     echo "kgc -n kube-system - will get all pods in the kube-system namespace"
     echo "kgc with no arguments will get all containers in the current context's namespace"
+    echo "kgc <namespace> - will get all pods in the specified namespace"
     echo "Available options:"
     echo "  -a or -A       Get containers in all namespaces"
     echo "  -n namespace   Specific namespace"
