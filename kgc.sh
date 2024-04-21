@@ -270,9 +270,9 @@ function print_failure_events() {
   elif [[ $failure_reason = "null" ]]; then
     printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "No recent events"
   elif [[ $current_type == "replica_set" ]]; then
-    printf "${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}:\n${CYAN}%s${RESET}\n" "$current_namespace" "$current_object" "$failure_reason"
+    printf "${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$current_namespace" "$current_object" "$failure_reason"
   else
-    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}\n${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object:" "$failure_reason"
+    printf "${RED}(%s) ${RESET}${YELLOW}%s${RESET}${WHITE}/${RESET}${RED}%s${RESET}: ${CYAN}%s${RESET}\n" "$index" "$current_namespace" "$current_object" "$failure_reason"
   fi
 }
 
