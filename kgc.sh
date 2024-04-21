@@ -27,13 +27,14 @@ RESET="\033[0m"
 
 
 # Initialize argument variables
-a_argument=false
-n_argument=""
+all_argument=false
+namespace_argument=""
 hide_pod_errors=false
 hide_replicaset_errors=false
 
-# Check for -h or --help before getopts loop
-if [[ " $* " =~ (--help|-h) ]]; then
+# Print usage information
+usage() {
+
     echo "Usage: $(basename $0) [namespace] OR [OPTION]..."
     echo "Examples:"
     echo "kgc -n kube-system - will get all pods in the kube-system namespace"
@@ -44,41 +45,50 @@ if [[ " $* " =~ (--help|-h) ]]; then
     echo "  -p             Hide pod error list"
     echo "  -r             Hide replicaset error list"
     echo "  -h or --help   Display this help and exit"
-    return
-fi
+    if [[ $1 == "h" ]]; then
+      exit 1
+    else
+      exit 0
+    fi
+}
 
 # Parse arguments if n is passed it requires a namespace
-while getopts ":aAn:pr" opt; do
-  case ${opt} in
-    a | A )
-      a_argument=true  # Set to true when -a or -A is triggered
+while getopts ":aAprhn:" opt; do
+  case $opt in
+    a|A)
+      all_argument="true"  # Set to true when -a or -A is triggered
       ;;
-    n )
-      n_argument=$OPTARG
+    p)
+      hide_pod_errors="true"  # Set to true when -p is triggered
+      # echo "hide_pod_errors=$hide_pod_errors"
       ;;
-    p )
-      hide_pod_errors=true
+    r)
+      hide_replicaset_errors="true"  # Set to true when -r is triggered
+      # echo "hide_replicaset_errors=$hide_replicaset_errors"
       ;;
-    r )
-      hide_replicaset_errors=true
+    n)
+      namespace_argument="$OPTARG"  # Capture the namespace argument
       ;;
-    \? )
-      echo "Invalid option: $OPTARG" 1>&2
-      exit 1
+    h)
+      usage
       ;;
-    : )
-      echo "Invalid option: $OPTARG requires an argument" 1>&2
-      exit 1
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage "h"
+      ;;
+    :)
+      echo "Invalid option: -$OPTARG requires an argument" >&2
+      usage
       ;;
   esac
 done
 shift $((OPTIND -1))
 
 # get the namespace from the first argument, otherwise use the current namespace
-if [[ -z "$n_argument" ]]; then
+if [[ -z "$namespace_argument" ]]; then
   namespace_arg=$1
 else
-  namespace_arg=$n_argument
+  namespace_arg=$namespace_argument
 fi
 
 issue_counter=0
@@ -90,7 +100,7 @@ else
   namespace=$namespace_arg
 fi
 
-if [[ $a_argument == true ]]; then
+if [[ $all_argument == true ]]; then
   namespace_arg="all"
 fi
 
@@ -286,5 +296,5 @@ function print_table_header() {
   fi
 }
 
-kgc "$1" "$2"
+kgc "$1" "$2" "$3" "$4" "$5"
 

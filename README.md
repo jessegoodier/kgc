@@ -45,8 +45,8 @@ Or simply:
 
 ```sh
 wget -O ~/kgc.sh https://raw.githubusercontent.com/jessegoodier/kgc/main/kgc.sh
-echo "source ~/kgc.sh" >> ~/.zshrc
-echo "source ~/kgc.sh" >> ~/.bashrc
+echo "alias kgc=~/kgc.sh" >> ~/.zshrc
+echo "alias kgc=~/kgc.sh" >> ~/.bashrc
 ```
 
 ## Example commands
@@ -55,7 +55,7 @@ echo "source ~/kgc.sh" >> ~/.bashrc
 Usage: kgc [namespace] OR [arguments]...
 Examples:
 kgc -n kube-system - will get all pods in the kube-system namespace
-kgc with no arguments will get all containers in the current context's namespace
+kgc with no arguments will get all containers in the current context namespace
 Available arguments:
   -a or -A       Get containers in all namespaces
   -n namespace   Specific namespace
