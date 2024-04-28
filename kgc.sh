@@ -23,6 +23,7 @@ YELLOW="\033[1;33m"
 WHITE="\033[1;37m"
 CYAN="\033[0;36m"
 GREEN="\033[0;32m"
+BLUE="\033[0;34m"
 RESET="\033[0m"
 
 
@@ -201,10 +202,10 @@ for pod in "${pod_list[@]}"; do
     fi
 
     if [[ "$container_ready" == "true" ]]; then
-      printf "${GREEN}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready"
+      printf "${BLUE}%-${namespace_column}s${RESET} %-${pod_column}s %-${container_name_column}s %-${container_image_column}s ${GREEN}%-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready"
     elif [[ "$container_ready" == "unschedulable" ]]; then
       ((issue_counter+=1))
-      printf "${RED}%-${namespace_column}s %-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready ($issue_counter)"
+      printf "${BLUE}%-${namespace_column}s${RESET} ${RED}%-${pod_column}s$ %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready ($issue_counter)"
       current_failures+=("$pod"/"$namespace")
     else
       terminated_reason=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers[0].state.terminated.reason")
