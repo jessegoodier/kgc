@@ -10,7 +10,7 @@
 # alias kgc="~/kgc.sh"
 # You may have an alias for kgc already, if so, you can unalias it before sourcing this file
 # unalias kgc 2> /dev/null
-# There are not a ton of comments in this file, but any AI can explain it, whih I find to be simple to do and cleaner than adding comments
+# There are not a ton of comments in this file, but any AI can explain it, which I find to be simple to do and cleaner than adding comments
 # I attempted to make the output as clean as possible, but it is not perfect, for example, the space before the pod when not using `kgc all`
 
 function kgc {
@@ -44,8 +44,8 @@ usage() {
     echo "Available options:"
     echo "  -a or -A       Get containers in all namespaces"
     echo "  -n namespace   Specific namespace"
-    echo "  -p             Hide pod error list"
-    echo "  -r             Hide replicaset error list"
+    echo "  -p             Hide pod error list. This can be added to the alias to make it the default behavior"
+    echo "  -r             Hide replicaset error list. This can be added to the alias to make it the default behavior"
     echo "  -h or --help   Display this help and exit"
     if [[ $1 == "h" ]]; then
       exit 1
@@ -182,7 +182,7 @@ for pod in "${pod_list[@]}"; do
   # shellcheck disable=SC2207
   containers_in_this_pod_list=($(echo "$pods_json" | jq -r --arg pod "$pod" '. | select(.metadata.name == $pod) | select(.spec.containers != null) | .spec.containers[].name'))
   containers_statuses_json=$(echo "$pods_json" | jq -r ".| select(.metadata.name == \"$pod\") | select(.status.containerStatuses != null) | .status.containerStatuses[]")
-  
+
   for container_name in "${containers_in_this_pod_list[@]}"; do
     # check to see if the pod is unschedulable
     is_unschedulable=$(echo "$pods_json" |  jq -r ".| select(.metadata.name == \"$pod\") |.status.conditions[] | select(.reason == \"Unschedulable\") | .reason")
@@ -205,7 +205,7 @@ for pod in "${pod_list[@]}"; do
       printf "${BLUE}%-${namespace_column}s${RESET} %-${pod_column}s %-${container_name_column}s %-${container_image_column}s ${GREEN}%-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready"
     elif [[ "$container_ready" == "unschedulable" ]]; then
       ((issue_counter+=1))
-      printf "${BLUE}%-${namespace_column}s${RESET} ${RED}%-${pod_column}s$ %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready ($issue_counter)"
+      printf "${BLUE}%-${namespace_column}s${RESET} ${RED}%-${pod_column}s %-${container_name_column}s %-${container_image_column}s %-${status_column}s\n${RESET}" "$ns_col" "$pod" "$container_name" "$container_image_short" "$container_ready ($issue_counter)"
       current_failures+=("$pod"/"$namespace")
     else
       terminated_reason=$(echo "$pods_json" | jq -r ".| select(.name == \"$pod\") |.containers[0].state.terminated.reason")
