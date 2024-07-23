@@ -20,7 +20,7 @@ By default, it also prints related errors to help fix issues.
 1. jq version 1.6 does not work. jq-1.7.1 does work
 2. bash and zsh have been tested and should both work. May need modern bash versions.
 
-Please file an issue with the detials if you find anything. Also happy to accept pull requests
+Please file an issue with the details if you find anything. Also happy to accept pull requests
 
 ## Usage
 
