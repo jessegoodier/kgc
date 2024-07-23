@@ -4,7 +4,7 @@ The name `kgc` is because it is like the alias `kgp` for `kubectl get pods`
 
 `kgc` is to `k get containers` (if you don't alias k to kubectl, you should)
 
-It also prints related errors to help fix.
+By default, it also prints related errors to help fix issues.
 
 ![kgc-screenshot](kgc.png)
 
@@ -46,8 +46,8 @@ kgc <namespace> - will get all pods in the specified namespace
 Available options:
   -a or -A       Get containers in all namespaces
   -n namespace   Specific namespace
-  -p             Hide pod error list
-  -r             Hide replicaset error list
+  -p             Hide pod error list. This can be added to the alias to make it the default behavior
+  -r             Hide replicaset error list. This can be added to the alias to make it the default behavior
   -h or --help   Display this help and exit
 ```
 
