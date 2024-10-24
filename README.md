@@ -61,6 +61,7 @@ Or simply:
 
 ```sh
 wget -O ~/kgc.sh https://raw.githubusercontent.com/jessegoodier/kgc/main/kgc.sh
+chmod +x ~/kgc.sh
 echo "alias kgc=~/kgc.sh" >> ~/.zshrc
 echo "alias kgc=~/kgc.sh" >> ~/.bashrc
 ```
